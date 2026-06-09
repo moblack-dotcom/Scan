@@ -787,6 +787,12 @@
     </button>
     <input type="file" id="photoCaptureInput" accept="image/*" style="display:none" onchange="handlePhotoCapture(event)">
 
+    <button class="photo-btn-main" onclick="document.getElementById('albumInput').click()">
+      <span class="camera-icon">📁</span>
+      <span>رفع من الألبوم</span>
+    </button>
+    <input type="file" id="albumInput" accept="image/*" style="display:none" onchange="handlePhotoCapture(event)">
+
     <div class="divider-text">أو أدخل الباركود يدوياً</div>
 
     <div class="search-box">
