@@ -843,7 +843,12 @@
             <div class="detail-label">الفئة</div>
             <div class="detail-value" id="categoryVal"></div>
           </div>
+          <div class="detail-item" id="priceItem" style="grid-column: 1 / -1; display:none;">
+            <div class="detail-label">السعر</div>
+            <div class="detail-value" id="priceVal"></div>
+          </div>
         </div>
+        <div id="onlineLink" style="margin-top:12px;"></div>
       </div>
     </div>
   </div>
@@ -1274,40 +1279,74 @@ function showProductCard(barcode, product) {
     changeBtn.style.display = 'none';
   }
 
+  // Show/hide price
+  const priceItem = document.getElementById('priceItem');
+  const priceVal = document.getElementById('priceVal');
+  if (product.price) {
+    priceVal.textContent = product.price;
+    priceItem.style.display = '';
+  } else {
+    priceItem.style.display = 'none';
+  }
+
+  // ONTIME link
+  const onlineLink = document.getElementById('onlineLink');
+  const handle = (product.itemId && product.itemId !== barcode) ? product.itemId.toLowerCase() : null;
+  if (handle) {
+    onlineLink.innerHTML = `<a href="https://ontime.com/products/${handle}" target="_blank"
+      style="display:inline-flex;align-items:center;gap:6px;color:#fff;background:var(--gold);border-radius:10px;padding:8px 16px;font-size:13px;text-decoration:none;font-weight:600;">
+      🛍️ عرض على ONTIME
+    </a>`;
+  } else {
+    onlineLink.innerHTML = '';
+  }
+
   document.getElementById('resultCard').classList.add('visible');
 }
 
 async function searchOnline(barcode) {
   const error = document.getElementById('errorCard');
-  error.innerHTML = '<strong>🔍 جاري البحث أونلاين...</strong><p>لحظة من فضلك</p>';
+  error.innerHTML = '<strong>🔍 جاري البحث على ONTIME...</strong><p>لحظة من فضلك</p>';
   error.classList.add('visible');
 
   try {
-    // Open Food Facts API
-    const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const res = await fetch(
+      `https://ontime.com/search/suggest.json?q=${encodeURIComponent(barcode)}&resources[type]=product&resources[limit]=5`,
+      { headers: { 'Accept': 'application/json' } }
+    );
     const data = await res.json();
+    const products = data?.resources?.results?.products || [];
 
-    if (data.status === 1 && data.product) {
-      const p = data.product;
+    if (products.length > 0) {
+      const p = products[0];
+      const rawPrice = p.price ? parseInt(p.price) / 100 : null;
+      const priceStr = rawPrice ? `${rawPrice.toFixed(3)} KD` : null;
       error.classList.remove('visible');
       showProductCard(barcode, {
-        name: p.product_name || p.product_name_en || p.product_name_ar || 'غير محدد',
-        brand: p.brands || '—',
-        category: p.categories || p.categories_tags?.[0]?.replace('en:', '') || '—',
-        itemId: barcode,
-        imageUrl: p.image_front_small_url || p.image_url || null
+        name: p.title || '—',
+        brand: p.vendor || '—',
+        category: '—',
+        itemId: p.handle || barcode,
+        imageUrl: p.featured_image?.url || null,
+        price: priceStr
       });
       return;
     }
   } catch(e) {}
 
-  // Fallback: show not found with web search link
-  error.innerHTML = \`<strong>❌ الباركود غير موجود</strong>
-    <p>تأكد من الرقم وحاول مرة أخرى</p>
-    <a href="https://www.google.com/search?q=${barcode}+barcode+product" target="_blank"
-       style="display:inline-block;margin-top:12px;color:var(--gold);font-size:13px;text-decoration:underline;">
-       🔎 ابحث عنه في Google
-    </a>\`;
+  // Not found — show search links
+  error.innerHTML = `<strong>❌ المنتج غير موجود محلياً</strong>
+    <p style="margin:8px 0;font-size:13px;color:var(--text-muted);">لم يتم العثور على الباركود: ${barcode}</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px;">
+      <a href="https://ontime.com/search?type=product&q=${encodeURIComponent(barcode)}" target="_blank"
+         style="display:flex;align-items:center;justify-content:center;gap:8px;color:#fff;background:var(--gold);border-radius:10px;padding:10px 16px;font-size:13px;text-decoration:none;font-weight:600;">
+         🛍️ ابحث على ONTIME
+      </a>
+      <a href="https://www.google.com/search?q=${encodeURIComponent(barcode)}+jewelry" target="_blank"
+         style="display:flex;align-items:center;justify-content:center;gap:8px;color:var(--gold);border:1px solid var(--gold);border-radius:10px;padding:10px 16px;font-size:13px;text-decoration:none;">
+         🔎 ابحث على Google
+      </a>
+    </div>`;
 }
 
 function search() {
