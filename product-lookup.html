@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>مسح المنتجات</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -993,41 +994,30 @@ function deleteEmployee(id) {
   alert('تم حذف الموظف ' + id);
 }
 
-// Camera & Barcode scanning
-let videoStream = null;
-let scanInterval = null;
+// Camera & Barcode scanning (ZXing - works on iOS Safari & all browsers)
+let codeReader = null;
 
 async function openCamera() {
   const modal = document.getElementById('cameraModal');
   modal.classList.add('open');
+  document.getElementById('scanHint').textContent = 'وجّه الكاميرا نحو الباركود ليُقرأ تلقائياً';
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-    });
-    videoStream = stream;
+    codeReader = new ZXing.BrowserMultiFormatReader();
     const videoEl = document.getElementById('cameraVideo');
-    videoEl.srcObject = stream;
-    await videoEl.play();
 
-    // Use BarcodeDetector if available
-    if ('BarcodeDetector' in window) {
-      const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code'] });
-      scanInterval = setInterval(async () => {
-        try {
-          const barcodes = await detector.detect(videoEl);
-          if (barcodes.length > 0) {
-            const barcode = barcodes[0].rawValue;
-            closeCamera();
-            document.getElementById('barcodeInput').value = barcode;
-            search();
-          }
-        } catch(e) {}
-      }, 300);
-    } else {
-      // Fallback: manual entry hint
-      document.getElementById('scanHint').textContent = 'الكاميرا تعمل — اكتب الباركود يدوياً أو جرب من Chrome';
-    }
+    await codeReader.decodeFromConstraints(
+      { video: { facingMode: { ideal: 'environment' } } },
+      videoEl,
+      (result, err) => {
+        if (result) {
+          const barcode = result.getText();
+          closeCamera();
+          document.getElementById('barcodeInput').value = barcode;
+          search();
+        }
+      }
+    );
   } catch(e) {
     closeCamera();
     if (e.name === 'NotAllowedError') {
@@ -1041,8 +1031,10 @@ async function openCamera() {
 function closeCamera() {
   const modal = document.getElementById('cameraModal');
   modal.classList.remove('open');
-  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-  if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+  if (codeReader) {
+    codeReader.reset();
+    codeReader = null;
+  }
   const videoEl = document.getElementById('cameraVideo');
   videoEl.srcObject = null;
 }
