@@ -1246,31 +1246,14 @@ const DB = {"8033288989318":{"itemId":"SAIW123","name":"BRACELET","category":"WJ
 const images = {};
 let currentBarcode = null;
 
-function search() {
-  const barcode = document.getElementById('barcodeInput').value.trim();
-  if (!barcode) return;
-
-  const result = document.getElementById('resultCard');
-  const error = document.getElementById('errorCard');
-  const product = DB[barcode];
-
-  result.classList.remove('visible');
-  error.classList.remove('visible');
-
-  if (!product) {
-    error.classList.add('visible');
-    return;
-  }
-
+function showProductCard(barcode, product) {
   currentBarcode = barcode;
-
-  document.getElementById('brandBadge').textContent = product.brand;
-  document.getElementById('productName').textContent = product.name;
+  document.getElementById('brandBadge').textContent = product.brand || '—';
+  document.getElementById('productName').textContent = product.name || '—';
   document.getElementById('barcodeVal').textContent = barcode;
-  document.getElementById('itemIdVal').textContent = product.itemId;
-  document.getElementById('categoryVal').textContent = product.category;
+  document.getElementById('itemIdVal').textContent = product.itemId || '—';
+  document.getElementById('categoryVal').textContent = product.category || '—';
 
-  // Check if image saved
   const img = document.getElementById('productImage');
   const noImg = document.getElementById('noImage');
   const changeBtn = document.getElementById('changeImageBtn');
@@ -1280,13 +1263,69 @@ function search() {
     img.classList.add('visible');
     noImg.style.display = 'none';
     changeBtn.style.display = 'block';
+  } else if (product.imageUrl) {
+    img.src = product.imageUrl;
+    img.classList.add('visible');
+    noImg.style.display = 'none';
+    changeBtn.style.display = 'block';
   } else {
     img.classList.remove('visible');
     noImg.style.display = 'block';
     changeBtn.style.display = 'none';
   }
 
-  result.classList.add('visible');
+  document.getElementById('resultCard').classList.add('visible');
+}
+
+async function searchOnline(barcode) {
+  const error = document.getElementById('errorCard');
+  error.innerHTML = '<strong>🔍 جاري البحث أونلاين...</strong><p>لحظة من فضلك</p>';
+  error.classList.add('visible');
+
+  try {
+    // Open Food Facts API
+    const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const data = await res.json();
+
+    if (data.status === 1 && data.product) {
+      const p = data.product;
+      error.classList.remove('visible');
+      showProductCard(barcode, {
+        name: p.product_name || p.product_name_en || p.product_name_ar || 'غير محدد',
+        brand: p.brands || '—',
+        category: p.categories || p.categories_tags?.[0]?.replace('en:', '') || '—',
+        itemId: barcode,
+        imageUrl: p.image_front_small_url || p.image_url || null
+      });
+      return;
+    }
+  } catch(e) {}
+
+  // Fallback: show not found with web search link
+  error.innerHTML = \`<strong>❌ الباركود غير موجود</strong>
+    <p>تأكد من الرقم وحاول مرة أخرى</p>
+    <a href="https://www.google.com/search?q=${barcode}+barcode+product" target="_blank"
+       style="display:inline-block;margin-top:12px;color:var(--gold);font-size:13px;text-decoration:underline;">
+       🔎 ابحث عنه في Google
+    </a>\`;
+}
+
+function search() {
+  const barcode = document.getElementById('barcodeInput').value.trim();
+  if (!barcode) return;
+
+  const result = document.getElementById('resultCard');
+  const error = document.getElementById('errorCard');
+
+  result.classList.remove('visible');
+  error.classList.remove('visible');
+
+  const product = DB[barcode];
+  if (product) {
+    showProductCard(barcode, product);
+  } else {
+    searchOnline(barcode);
+  }
 }
 
 
